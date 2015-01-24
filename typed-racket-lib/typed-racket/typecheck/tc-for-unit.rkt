@@ -19,11 +19,13 @@
   (syntax-parse stx
     #:literal-sets (kernel-literals)
     [(let-values ()
+       (quote for-kw)
        (#%expression
         (#%plain-lambda ()
           (let-values ([_ rhs] ...)
             (#%plain-app _))))
        for-loop)
+     (define kind (syntax-e #'for-kw))
      (define *bodies (find-loop-bodies #'for-loop))
      (match-define (cons names-stx bodies) *bodies)
      (define rhs-stxs (syntax->list #'(rhs ...)))
@@ -55,11 +57,8 @@
      (define bodies-result
        (with-lexical-env/extend-types names types
          ;; FIXME expected
-         (tc-body/check #`#,bodies #f)))
-     (match bodies-result
-       ;; FIXME other cases
-       [(tc-result1: t f o)
-        (ret (-lst t) f o)])]))
+         (tc-body/check #`#,bodies (make-for-body-expected kind expected))))
+     (check-for-result kind bodies-result)]))
 
 ;; Type -> Type
 ;; Converts a sequence type to element types, with special
@@ -93,6 +92,49 @@
                      "expected" (format "sequence with ~a values"
                                         (length names))
                      "given" seq-type)))
+
+;; Symbol (U TC-Results #f) -> (U TC-Results #f)
+(define (make-for-body-expected kind expected)
+  (match expected
+    [#f #f]
+    [(tc-result1: t f o)
+     (match kind
+       [(or 'for/hash 'for/hasheq 'for/hasheqv)
+        (match t
+          [(Hashtable: k v) (ret (list k v))]
+          [_ #f])]
+       ['for/list
+        (match t
+          [(Listof: t) (ret t)]
+          [(List: ts) (ret (apply Un ts))]
+          [_ #f])]
+       [(or 'for/first 'for/last 'for/and 'for/or)
+        expected]
+       [_ #f])]
+    [(tc-results: ts fs os)
+     ;; FIXME: only relevant for for/fold, for/lists, etc.
+     #f]
+    [(tc-any-results: _)
+     #f]))
+
+;; Symbol TC-Results -> TC-Results
+(define (check-for-result kind result)
+  (match result
+    [(tc-result1: t f o)
+     (match kind
+       ['for/list (ret (-lst t))]
+       [(or 'for/first 'for/last 'for/and 'for/or)
+        (ret t)])]
+    [(tc-results: ts fs os)
+     (match kind
+       [(or 'for/hash 'for/hasheq 'for/hasheqv)
+        #:when (= (length ts) 2)
+        (ret (-HT (car ts) (cadr ts)))]
+       [_ (tc-error/fields "type mismatch"
+                           #:more "wrong number of values"
+                           "given" (length ts))])]
+    [(tc-any-results: _)
+     (int-err "foo")]))
 
 ;; Invariant: the first loop body found is always a special one
 ;;            that stores names that TR will track.

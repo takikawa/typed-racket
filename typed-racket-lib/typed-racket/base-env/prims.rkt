@@ -22,7 +22,7 @@ This file defines two sorts of primitives. All of them are provided into any mod
 |#
 
 
-(provide (except-out (all-defined-out) dtsi* dtsi/exec* -let-internal define-for-variants define-for*-variants
+(provide (except-out (all-defined-out) dtsi* dtsi/exec* -let-internal define-for*-variants
                      with-handlers: define-for/acc:-variants base-for/flvector: base-for/vector
                      -lambda -define -do -let -let* -let*-values -let-values -let/cc -let/ec -letrec -letrec-values -struct)
          ;; provide the contracted bindings as primitives
@@ -886,22 +886,6 @@ This file defines two sorts of primitives. All of them are provided into any mod
              (clause.expand ... ...)
              c ...))))])))
 
-(define-syntax (define-for-variants stx)
-  (syntax-parse stx
-    [(_ (name untyped-name) ...)
-     (quasisyntax/loc
-         stx
-       (begin (define-syntax name (define-for-variant #'untyped-name)) ...))]))
-
-;; for/vector:, for/flvector:, for/and:, for/first: and
-;; for/last:'s expansions can't currently be handled by the typechecker.
-(define-for-variants
-  ;(for/list: for/list)
-  (for/and: for/and)
-  (for/or: for/or)
-  (for/first: for/first)
-  (for/last: for/last))
-
 ;; Unlike with the above, the inferencer can handle any number of #:when
 ;; clauses with these 2.
 (define-syntax (for/lists: stx)
@@ -1058,29 +1042,6 @@ This file defines two sorts of primitives. All of them are provided into any mod
   (for*/list: for*/fold: for*/list #t (lambda (x y) (cons y x)) null reverse)
   (for/product: for/fold: for/product #f * 1 #%expression)
   (for*/product: for*/fold: for*/product #t * 1 #%expression))
-
-(define-for-syntax (define-for/hash:-variant hash-maker)
-  (lambda (stx)
-    (syntax-parse stx
-      [(_ a1:optional-standalone-annotation*
-          clause:for-clauses
-          a2:optional-standalone-annotation*
-          body ...) ; body is not always an expression, can be a break-clause
-       (define a.ty (or (attribute a2.ty) (attribute a1.ty)))
-       (if a.ty
-           (quasisyntax/loc stx
-             (for/fold: : #,a.ty
-               ((return-hash : #,a.ty (ann (#,hash-maker null) #,a.ty)))
-               (clause.expand ... ...)
-               (let-values (((key val) (let () body ...)))
-                 (hash-set return-hash key val))))
-           (syntax/loc stx
-             (for/hash (clause.expand ... ...)
-               body ...)))])))
-
-(define-syntax for/hash:    (define-for/hash:-variant #'make-immutable-hash))
-(define-syntax for/hasheq:  (define-for/hash:-variant #'make-immutable-hasheq))
-(define-syntax for/hasheqv: (define-for/hash:-variant #'make-immutable-hasheqv))
 
 (define-for-syntax (define-for*/hash:-variant hash-maker)
   (lambda (stx)

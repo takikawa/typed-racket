@@ -3499,6 +3499,17 @@
        [tc-e (for/list ([(k v) #hash((x . "x"))])
                (symbol->string k))
              (-lst -String)]
+       [tc-e (for/and ([x '(a b c)]) (symbol->string x))
+             -String]
+       [tc-e (for/or ([x '(a b c)]) (symbol->string x))
+             -String]
+       [tc-e (for/first ([x '(a b c)]) (symbol->string x))
+             -String]
+       [tc-e (for/last ([x '(a b c)]) (symbol->string x))
+             -String]
+       [tc-e (for/hash ([x '(a b c)])
+               (values (symbol->string x) (symbol->string x)))
+             (-HT -String -String)]
        [tc-err (let ()
                  (for/list ([x #hash((x . "x"))]) x)
                  (error "foo"))
@@ -3516,7 +3527,7 @@
                  (for/list : (Listof Symbol) ([x (in-list '("a" "b" "c"))])
                    (string-append x "bar"))
                  (error "foo"))
-               #:msg #rx"expected: \\(Listof Symbol\\).*given: \\(Listof String\\)"]
+               #:msg #rx"expected: Symbol.*given: String"]
        )
 
   (test-suite

@@ -7,7 +7,14 @@
                      (base-env annotate-classes)
                      (private syntax-properties)))
 
-(provide for/list:)
+(provide for/list:
+         for/and:
+         for/or:
+         for/first:
+         for/last:
+         for/hash:
+         for/hasheq:
+         for/hasheqv:)
 
 ;; FIXME
 (define-for-syntax (add-ann expr-stx ty-stx)
@@ -36,7 +43,14 @@
                                    (add-ann stx #'ty)
                                    stx)))))
 
-(define-syntax (for/list: stx)
+(define-syntax (define-for-variants stx)
+  (syntax-parse stx
+    [(_ (name untyped-name) ...)
+     (quasisyntax/loc
+         stx
+       (begin (define-syntax name (define-for-variant #'untyped-name)) ...))]))
+
+(define-for-syntax ((define-for-variant untyped-name) stx)
   (syntax-parse stx
     [(_
       a1:optional-standalone-annotation*
@@ -49,12 +63,25 @@
        (tr:for
         (quasisyntax/loc stx
           (let-values ()
+            ;; FIXME: parameterize this
+            (quote #,(syntax-e untyped-name))
             (λ ()
               (let-values ([clause.names clause.rhs] ...)
                 (void)))
-            (for/list (clause.new-form ...)
+            ;; FIXME: parameterize loop
+            (#,untyped-name (clause.new-form ...)
               #,(tr:for:body
                  #'(λ ()
                      (let-values ([clause.names clause.names-val] ...)
                        (void))))
               #,@(map tr:for:body body-forms)))))))]))
+
+(define-for-variants
+  (for/list: for/list)
+  (for/and: for/and)
+  (for/or: for/or)
+  (for/first: for/first)
+  (for/last: for/last)
+  (for/hash: for/hash)
+  (for/hasheq: for/hasheq)
+  (for/hasheqv: for/hasheqv))
