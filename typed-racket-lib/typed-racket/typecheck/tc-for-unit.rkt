@@ -5,6 +5,7 @@
          racket/function
          racket/match
          syntax/parse
+         syntax/parse/experimental/reflect
          (env global-env lexical-env)
          (private syntax-properties type-annotation)
          (rep type-rep)
@@ -31,29 +32,35 @@
      (match-define (cons names-stx bodies) *bodies)
      (define rhs-stxs (syntax->list #'(rhs ...)))
      (define clause-names (parse-clause-names names-stx))
-     (define-values (*names *types)
-       (for/lists (_1 _2)
-                  ([names-stx (in-list clause-names)]
-                   [rhs-stx (in-list rhs-stxs)])
-         (define names (syntax->list names-stx))
-         (define expected-types
-           (for/list ([name names])
-             (match (get-type name #:default 'no-type-found)
-               ['no-type-found #f] ; for expected type
-               [type type])))
-         (define expected-result
-           ;; FIXME: is this the best behavior? Synthesize if no annotations
-           ;;        are given, assume Any for partial annotations.
-           (if (andmap not expected-types)
-               #f
-               (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
-         (define result (tc-expr/check/t rhs-stx expected-result))
-         (define elem-types (seq->elem-type result))
-         (check-seq-length result elem-types names)
-         (check-binding-annotations elem-types names)
-         (values names elem-types)))
      (define-values (names types)
-       (values (apply append *names) (apply append *types)))
+       (for/fold ([names null] [types null])
+                 ([names-stx (in-list clause-names)]
+                  [rhs-stx (in-list rhs-stxs)])
+         (syntax-parse names-stx
+           #:literal-sets (kernel-literals)
+           [('#:when)
+            (with-lexical-env/extend-types names types
+              (tc-expr rhs-stx))
+            (values names types)]
+           [_
+            (define new-names (syntax->list names-stx))
+            (define expected-types
+              (for/list ([name new-names])
+                (match (get-type name #:default 'no-type-found)
+                  ['no-type-found #f] ; for expected type
+                  [type type])))
+            (define expected-result
+              ;; FIXME: is this the best behavior? Synthesize if no annotations
+              ;;        are given, assume Any for partial annotations.
+              (if (andmap not expected-types)
+                  #f
+                  (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
+            (define result (tc-expr/check/t rhs-stx expected-result))
+            (define elem-types (seq->elem-type result))
+            (check-seq-length result elem-types new-names)
+            (check-binding-annotations elem-types new-names)
+            (values (append names new-names)
+                    (append types elem-types))])))
      (printf "names ~a types ~a~n" names types)
      (define bodies-result
        (with-lexical-env/extend-types names types
@@ -151,11 +158,18 @@
 ;; Invariant: the first loop body found is always a special one
 ;;            that stores names that TR will track.
 (define (find-loop-bodies stx)
+  (find-stx-class (reify-syntax-class stx:tr:for:body^)))
+
+;; Finds #:when clauses and other related clauses
+(define (find-when stx)
+  (find-stx-class (reify-syntax-class stx:tr:for:when^)))
+
+(define (find-stx-class cls)
   (reverse
    (let loop ([form stx] [bodies null])
      (syntax-parse form
        #:literal-sets (kernel-literals)
-       [stx:tr:for:body^
+       [(~reflect var (cls))
         (cons form bodies)]
        [(e ...)
         (for/fold ([bodies bodies])

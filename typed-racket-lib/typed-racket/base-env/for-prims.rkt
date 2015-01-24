@@ -25,18 +25,20 @@
      #,expr-stx)))
 
 (begin-for-syntax
-  (define-syntax-class for-clause
+  (define-splicing-syntax-class for-clause
     #:attributes (names names-val rhs new-form)
     (pattern [n:optionally-annotated-name rhs:expr]
              #:with names #'(n.ann-name)
              #:with names-val #'(values n.ann-name)
-             #:with new-form #'[n.ann-name rhs])
+             #:with new-form #'([n.ann-name rhs]))
     (pattern [(n:optionally-annotated-formal ...) rhs:expr]
              #:with names #'(n.ann-name ...)
              #:with names-val #'(values n.ann-name ...)
-             #:with new-form #'[(n.ann-name ...) rhs])
-    ;(pattern (~seq #:with ))
-    )
+             #:with new-form #'([(n.ann-name ...) rhs]))
+    (pattern (~seq #:when rhs)
+             #:with names #'()
+             #:with names-val #'(values)
+             #:with new-form #`(#:when #,(tr:for:when #'rhs))))
 
   (define-splicing-syntax-class optional-standalone-annotation*
     #:attributes (ty annotate)
@@ -60,6 +62,8 @@
       a2:optional-standalone-annotation*
       body ...) ; body is not always an expression, can be a break-clause
      (define body-forms (syntax->list #'(body ...)))
+     (define new-forms (apply append (map syntax->list (syntax->list #'(clause.new-form ...)))))
+     (displayln new-forms)
      ((attribute a1.annotate)
       ((attribute a2.annotate)
        (tr:for
@@ -69,7 +73,7 @@
             (λ ()
               (let-values ([clause.names clause.rhs] ...)
                 (void)))
-            (#,untyped-name (clause.new-form ...)
+            (#,untyped-name (#,@new-forms)
               #,(tr:for:body
                  #'(λ ()
                      (let-values ([clause.names clause.names-val] ...)
