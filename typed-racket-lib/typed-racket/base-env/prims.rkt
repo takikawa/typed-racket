@@ -106,6 +106,7 @@ This file defines two sorts of primitives. All of them are provided into any mod
          "base-types.rkt"
          "base-types-extra.rkt"
          "case-lambda.rkt"
+         "for-prims.rkt"
          'struct-extraction
          racket/set
          racket/flonum ; for for/flvector and for*/flvector
@@ -894,7 +895,7 @@ This file defines two sorts of primitives. All of them are provided into any mod
 ;; for/vector:, for/flvector:, for/and:, for/first: and
 ;; for/last:'s expansions can't currently be handled by the typechecker.
 (define-for-variants
-  (for/list: for/list)
+  ;(for/list: for/list)
   (for/and: for/and)
   (for/or: for/or)
   (for/first: for/first)

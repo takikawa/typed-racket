@@ -28,7 +28,7 @@
                     (only-in racket/private/class-internal find-method/who)))
 
 (import tc-if^ tc-lambda^ tc-app^ tc-let^ tc-send^ check-subforms^ tc-literal^
-        check-class^ tc-expression^)
+        check-class^ tc-expression^ tc-for^)
 (export tc-expr^)
 
 (define-literal-set tc-expr-literals #:for-label
@@ -129,6 +129,10 @@
       ;; explicit failure
       [t:typecheck-failure
        (explicit-fail #'t.stx #'t.message #'t.var)]
+      ;; for loops
+      [stx:tr:for^
+       (register-ignored! form)
+       (tc/for form expected)]
       ;; data
       [(quote #f) (ret (-val #f) -false-filter)]
       [(quote #t) (ret (-val #t) -true-filter)]

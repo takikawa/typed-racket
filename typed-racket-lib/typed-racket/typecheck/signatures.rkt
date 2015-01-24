@@ -58,3 +58,5 @@
 (define-signature tc-dots^
   ([cond-contracted tc/dots (syntax? . -> . (values Type/c symbol?))]))
 
+(define-signature tc-for^
+  ([cond-contracted tc/for (syntax? (or/c tc-results/c #f) . -> . full-tc-results/c)]))
