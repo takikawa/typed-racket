@@ -13,6 +13,8 @@
          for/first:
          for/last:
          for/hash:
+         for/sum:
+         for/product:
          for/hasheq:
          for/hasheqv:)
 
@@ -63,12 +65,10 @@
        (tr:for
         (quasisyntax/loc stx
           (let-values ()
-            ;; FIXME: parameterize this
             (quote #,(syntax-e untyped-name))
             (λ ()
               (let-values ([clause.names clause.rhs] ...)
                 (void)))
-            ;; FIXME: parameterize loop
             (#,untyped-name (clause.new-form ...)
               #,(tr:for:body
                  #'(λ ()
@@ -82,6 +82,8 @@
   (for/or: for/or)
   (for/first: for/first)
   (for/last: for/last)
+  (for/sum: for/sum)
+  (for/product: for/product)
   (for/hash: for/hash)
   (for/hasheq: for/hasheq)
   (for/hasheqv: for/hasheqv))

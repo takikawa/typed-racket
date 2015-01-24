@@ -5,14 +5,15 @@
          racket/function
          racket/match
          syntax/parse
-         (env lexical-env)
+         (env global-env lexical-env)
          (private syntax-properties type-annotation)
          (rep type-rep)
          (typecheck check-below)
          (types abbrev numeric-tower subtype tc-result union)
-         (utils tc-utils))
+         (utils tc-utils)
+         (for-template racket/base))
 
-(import tc-expr^)
+(import tc-expr^ tc-apply^)
 (export tc-for^)
 
 (define (tc/for stx expected)
@@ -103,6 +104,10 @@
         (match t
           [(Hashtable: k v) (ret (list k v))]
           [_ #f])]
+       [(or 'for/sum 'for/product)
+        (match t
+          [(? (curryr subtype -Number)) (ret t)]
+          [_ #f])]
        ['for/list
         (match t
           [(Listof: t) (ret t)]
@@ -123,6 +128,13 @@
     [(tc-result1: t f o)
      (match kind
        ['for/list (ret (-lst t))]
+       [(or 'for/sum 'for/product)
+        (define tmps (generate-temporaries '(1)))
+        ;; FIXME: this is hackish and gives poor error messages
+        ;;        and sometimes has bad type precision.
+        (with-lexical-env/extend-types tmps (list (-lst t))
+          (tc/apply (if (eq? kind 'for/sum) #'+ #'*)
+                    #`#,tmps))]
        [(or 'for/first 'for/last 'for/and 'for/or)
         (ret t)])]
     [(tc-results: ts fs os)

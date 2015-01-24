@@ -1035,12 +1035,10 @@ This file defines two sorts of primitives. All of them are provided into any mod
                   for*? #'for/folder: #'for/folder #'op #'initial #'final))
               ...))]))
 (define-for/acc:-variants
-  (for/sum: for/fold: for/sum #f + 0 #%expression)
   (for/set: for/fold: for/set #f set-add (set) #%expression)
   (for*/set: for*/fold: for*/set #t set-add (set) #%expression)
   (for*/sum: for*/fold: for*/sum #t + 0 #%expression)
   (for*/list: for*/fold: for*/list #t (lambda (x y) (cons y x)) null reverse)
-  (for/product: for/fold: for/product #f * 1 #%expression)
   (for*/product: for*/fold: for*/product #t * 1 #%expression))
 
 (define-for-syntax (define-for*/hash:-variant hash-maker)
