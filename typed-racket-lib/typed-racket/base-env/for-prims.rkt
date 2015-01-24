@@ -17,13 +17,15 @@
 
 (begin-for-syntax
   (define-syntax-class for-clause
-    #:attributes (names names-val rhs)
-    (pattern [n:id rhs:expr]
-             #:with names #'(n)
-             #:with names-val #'(values n))
-    (pattern [(name:id ...) rhs:expr]
-             #:with names #'(name ...)
-             #:with names-val #'(values name ...))
+    #:attributes (names names-val rhs new-form)
+    (pattern [n:optionally-annotated-name rhs:expr]
+             #:with names #'(n.ann-name)
+             #:with names-val #'(values n.ann-name)
+             #:with new-form #'[n.ann-name rhs])
+    (pattern [(n:optionally-annotated-formal ...) rhs:expr]
+             #:with names #'(n.ann-name ...)
+             #:with names-val #'(values n.ann-name ...)
+             #:with new-form #'[(n.ann-name ...) rhs])
     ;(pattern (~seq #:with ))
     )
 
@@ -50,7 +52,7 @@
             (λ ()
               (let-values ([clause.names clause.rhs] ...)
                 (void)))
-            (for/list (clause ...)
+            (for/list (clause.new-form ...)
               #,(tr:for:body
                  #'(λ ()
                      (let-values ([clause.names clause.names-val] ...)

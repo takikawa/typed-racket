@@ -3481,6 +3481,42 @@
        ;; PR 14889
        [tc-err (ann (vector-ref (ann (vector "hi") (Vectorof String)) 0) Symbol)
                #:msg #rx"Polymorphic function.*could not be applied"]
+
+       ;; For loops
+       [tc-e (for/list ([x (in-list '("a" "b" "c"))])
+               (string-append x "bar"))
+             (-lst -String)]
+       [tc-e (for/list ([x '("a" "b" "c")])
+               (string-append x "bar"))
+             (-lst -String)]
+       [tc-e (for/list ([x '("a" #\a)]) (list x))
+             (-lst (-lst* (t:Un -String -Char)))]
+       [tc-e (for/list ([x 5]) (abs x))
+             (-lst -PosByte)]
+       [tc-e (for/list ([(k v) #hash((x . "x"))])
+               (string-append v "bar"))
+             (-lst -String)]
+       [tc-e (for/list ([(k v) #hash((x . "x"))])
+               (symbol->string k))
+             (-lst -String)]
+       [tc-err (let ()
+                 (for/list ([x #hash((x . "x"))]) x)
+                 (error "foo"))
+               #:msg #rx"wrong number of values"]
+       [tc-err (let ()
+                 (for/list ([x : Symbol '("a")]) x)
+                 (error "foo"))
+               #:msg #rx"expected: \\(Sequenceof Symbol\\).*given: \\(List String\\)"]
+       [tc-err (let ()
+                 (for/list ([x (in-list '("a" "b" "c"))])
+                   (symbol->string x))
+                 (error "foo"))
+               #:msg #rx"expected: Symbol.*given: String"]
+       [tc-err (let ()
+                 (for/list : (Listof Symbol) ([x (in-list '("a" "b" "c"))])
+                   (string-append x "bar"))
+                 (error "foo"))
+               #:msg #rx"expected: \\(Listof Symbol\\).*given: \\(Listof String\\)"]
        )
 
   (test-suite
