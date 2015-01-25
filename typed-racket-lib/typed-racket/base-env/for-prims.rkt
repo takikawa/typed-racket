@@ -35,8 +35,6 @@
              #:with names #'(n.ann-name ...)
              #:with names-val #'(values n.ann-name ...)
              #:with new-form #'([(n.ann-name ...) rhs]))
-    ;; FIXME: filters are relevant for #:when, #:unless,
-    ;;        #:break, #:final and may need special handling
     (pattern (~seq (~and kw (~or #:when #:unless
                                  #:break #:final))
                    seq-rhs)
