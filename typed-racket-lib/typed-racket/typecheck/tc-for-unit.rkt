@@ -38,41 +38,12 @@
      (define-values (accum-names clause-names)
        (parse-clause-names names-stx))
      (define accum-types
-       (for/list ([name (in-list accum-names)]
-                  [rhs-stx (in-list (syntax->list #'(accum-rhs ...)))])
-         (define expected-result
-           (match (get-type name #:default 'no-type-found)
-             ['no-type-found #f] ; for expected type
-             [type (ret type)]))
-         (define type (tc-expr/check/t rhs-stx expected-result))
-         (if expected-result
-             type
-             (generalize type))))
+       (check-accum-clauses accum-names
+                            (syntax->list #'(accum-rhs ...))))
      (define-values (names types)
-       (for/fold ([names null] [types null])
-                 ([names-stx (in-list clause-names)]
-                  [rhs-stx (in-list rhs-stxs)])
-         (define new-names (syntax->list names-stx))
-         (define expected-types
-           (for/list ([name new-names])
-             (match (get-type name #:default 'no-type-found)
-               ['no-type-found #f] ; for expected type
-               [type type])))
-         (define expected-result
-           ;; FIXME: is this the best behavior? Synthesize if no annotations
-           ;;        are given, assume Any for partial annotations.
-           (if (andmap not expected-types)
-               #f
-               (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
-         (define result (tc-expr/check/t rhs-stx expected-result))
-         (define elem-types (seq->elem-type result))
-         (check-seq-length result elem-types new-names)
-         (check-binding-annotations elem-types new-names)
-         (values (append names new-names)
-                 (append types elem-types))))
-     (printf "accum-names ~a accum-types ~a~n" accum-names accum-types)
-     (printf "names ~a types ~a~n" names types)
+       (check-binding-clauses clause-names rhs-stxs))
      ;; FIXME: this includes names that aren't bound in some #:when clauses
+     ;;        this isn't actually unsound, just potentially confusing
      (define props
        (with-lexical-env/extend-types accum-names accum-types
          (with-lexical-env/extend-types names types
@@ -111,6 +82,31 @@
     ;; FIXME
     [_ (int-err "foo")]))
 
+;; (Listof Syntax) (Listof Syntax) -> (Listof Id) (Listof Type)
+;; Typecheck for loop sequence binding clauses
+(define (check-binding-clauses clause-names rhs-stxs)
+  (for/fold ([names null] [types null])
+            ([names-stx (in-list clause-names)]
+             [rhs-stx (in-list rhs-stxs)])
+    (define new-names (syntax->list names-stx))
+    (define expected-types
+      (for/list ([name new-names])
+        (match (get-type name #:default 'no-type-found)
+          ['no-type-found #f] ; for expected type
+          [type type])))
+    (define expected-result
+      ;; FIXME: is this the best behavior? Synthesize if no annotations
+      ;;        are given, assume Any for partial annotations.
+      (if (andmap not expected-types)
+          #f
+          (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
+    (define result (tc-expr/check/t rhs-stx expected-result))
+    (define elem-types (seq->elem-type result))
+    (check-seq-length result elem-types new-names)
+    (check-binding-annotations elem-types new-names)
+    (values (append names new-names)
+            (append types elem-types))))
+
 ;; (Listof Type) (Listof Id) -> Void
 ;; Invariant: check-seq-length is called first so we can
 ;;            assume input lists of the same length
@@ -128,6 +124,20 @@
                      "expected" (format "sequence with ~a values"
                                         (length names))
                      "given" seq-type)))
+
+;; (Listof Id) (Listof Syntax) -> Type
+;; Typecheck for loop accumulator clauses for, e.g., for/fold
+(define (check-accum-clauses accum-names accum-rhss)
+  (for/list ([name (in-list accum-names)]
+             [rhs-stx (in-list accum-rhss)])
+    (define expected-result
+      (match (get-type name #:default 'no-type-found)
+        ['no-type-found #f] ; for expected type
+        [type (ret type)]))
+    (define type (tc-expr/check/t rhs-stx expected-result))
+    (if expected-result
+        type
+        (generalize type))))
 
 ;; Symbol (Listof Type) (U TC-Results #f) -> (U TC-Results #f)
 (define (make-for-body-expected kind accum-types expected)
