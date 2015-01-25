@@ -10,7 +10,7 @@
          (private syntax-properties type-annotation)
          (rep filter-rep type-rep)
          (typecheck check-below tc-envops)
-         (types abbrev numeric-tower subtype tc-result union)
+         (types abbrev generalize numeric-tower subtype tc-result union)
          (utils tc-utils)
          (for-template racket/base))
 
@@ -44,7 +44,10 @@
            (match (get-type name #:default 'no-type-found)
              ['no-type-found #f] ; for expected type
              [type (ret type)]))
-         (tc-expr/check/t rhs-stx expected-result)))
+         (define type (tc-expr/check/t rhs-stx expected-result))
+         (if expected-result
+             type
+             (generalize type))))
      (define-values (names types)
        (for/fold ([names null] [types null])
                  ([names-stx (in-list clause-names)]
@@ -88,7 +91,9 @@
        (with-lexical-env/extend-types accum-names accum-types
          (with-lexical-env/extend-types names types
            (with-lexical-env/extend-props props
-             (tc-body/check #`#,bodies (make-for-body-expected kind expected))))))
+             (tc-body/check
+              #`#,bodies
+              (make-for-body-expected kind accum-types expected))))))
      (check-for-result kind bodies-result)]))
 
 ;; Type -> Type
@@ -124,10 +129,12 @@
                                         (length names))
                      "given" seq-type)))
 
-;; Symbol (U TC-Results #f) -> (U TC-Results #f)
-(define (make-for-body-expected kind expected)
+;; Symbol (Listof Type) (U TC-Results #f) -> (U TC-Results #f)
+(define (make-for-body-expected kind accum-types expected)
   (match expected
-    [#f #f]
+    [#f (if (eq? kind 'for/fold)
+            (ret accum-types)
+            #f)]
     [(tc-result1: t f o)
      (match kind
        [(or 'for/hash 'for/hasheq 'for/hasheqv)
@@ -143,13 +150,15 @@
           [(Listof: t) (ret t)]
           [(List: ts) (ret (apply Un ts))]
           [_ #f])]
-       [(or 'for/first 'for/last 'for/and 'for/or 'for/fold)
+       [(or 'for/first 'for/last 'for/and 'for/or)
         expected]
+       ['for/fold
+        (ret accum-types)]
        [_ #f])]
     [(tc-results: ts fs os)
      (match kind
        ['for/fold
-        expected]
+        (ret accum-types)]
        [_ #f])]
     [(tc-any-results: _)
      #f]))
