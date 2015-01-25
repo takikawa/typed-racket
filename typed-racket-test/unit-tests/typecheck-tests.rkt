@@ -3512,6 +3512,35 @@
              (-HT -String -String)]
        [tc-e (for/list ([x '(-1 0 1 2 3)] #:when (positive? x)) x)
              (-lst -PosByte)]
+       [tc-e (for/list ([x '(-1 0 1 2 3)]
+                        #:unless (or (zero? x) (negative? x)))
+               x)
+             (-lst -PosByte)]
+       [tc-e (for/list ([x '(1 2 3 -1 -2)] #:break (negative? x)) x)
+             (-lst -PosByte)]
+       [tc-e (for/list ([x : Integer '(1 2 3 -1 -2)] #:final (negative? x)) x)
+             (-lst -Integer)]
+       [tc-err (let ()
+                 (for/list ([x '("a" "b")] #:when (symbol->string x)) x)
+                 (error "foo"))
+               #:msg #rx"expected: Symbol.*given: String"]
+       [tc-err (let ()
+                 (for/list ([x '("a" "b")] #:unless (symbol->string x)) x)
+                 (error "foo"))
+               #:msg #rx"expected: Symbol.*given: String"]
+       [tc-err (let ()
+                 (for/list ([x '("a" "b")] #:break (symbol->string x)) x)
+                 (error "foo"))
+               #:msg #rx"expected: Symbol.*given: String"]
+       [tc-err (let ()
+                 (for/list ([x '("a" "b")] #:final (symbol->string x)) x)
+                 (error "foo"))
+               #:msg #rx"expected: Symbol.*given: String"]
+       [tc-e (for/list ([x '(-1 0 1 2 3)]
+                        #:when (positive? x)
+                        #:when (negative? x))
+               x)
+             (-lst -Bottom)]
        [tc-err (let ()
                  (for/list ([x #hash((x . "x"))]) x)
                  (error "foo"))

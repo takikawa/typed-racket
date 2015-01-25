@@ -58,17 +58,17 @@
      ;; FIXME: this includes names that aren't bound in some #:when clauses
      (define props
        (with-lexical-env/extend-types names types
-         (for/fold ([props -no-filter])
+         (for/fold ([props null])
                    ([when-clause (in-list (find-whens #'for-loop))])
            (define kind (tr:for:when-property when-clause))
            (define results (tc-expr when-clause))
            (match results
              [(tc-results: _ (list (FilterSet: f+ f-) ...) _)
               (match kind
-                ['#:when f+]
-                ['#:unless f-]
-                [_ null])]
-             [_ null]))))
+                ['#:when (append f+ props)]
+                [(or '#:unless '#:break) (append f- props)]
+                [_ props])]
+             [_ props]))))
      (displayln props)
      (define bodies-result
        (with-lexical-env/extend-types names types
