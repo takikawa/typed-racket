@@ -8,8 +8,8 @@
          syntax/parse/experimental/reflect
          (env global-env lexical-env)
          (private syntax-properties type-annotation)
-         (rep type-rep)
-         (typecheck check-below)
+         (rep filter-rep type-rep)
+         (typecheck check-below tc-envops)
          (types abbrev numeric-tower subtype tc-result union)
          (utils tc-utils)
          (for-template racket/base))
@@ -36,36 +36,44 @@
        (for/fold ([names null] [types null])
                  ([names-stx (in-list clause-names)]
                   [rhs-stx (in-list rhs-stxs)])
-         (syntax-parse names-stx
-           #:literal-sets (kernel-literals)
-           [('#:when)
-            (with-lexical-env/extend-types names types
-              (tc-expr rhs-stx))
-            (values names types)]
-           [_
-            (define new-names (syntax->list names-stx))
-            (define expected-types
-              (for/list ([name new-names])
-                (match (get-type name #:default 'no-type-found)
-                  ['no-type-found #f] ; for expected type
-                  [type type])))
-            (define expected-result
-              ;; FIXME: is this the best behavior? Synthesize if no annotations
-              ;;        are given, assume Any for partial annotations.
-              (if (andmap not expected-types)
-                  #f
-                  (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
-            (define result (tc-expr/check/t rhs-stx expected-result))
-            (define elem-types (seq->elem-type result))
-            (check-seq-length result elem-types new-names)
-            (check-binding-annotations elem-types new-names)
-            (values (append names new-names)
-                    (append types elem-types))])))
+         (define new-names (syntax->list names-stx))
+         (define expected-types
+           (for/list ([name new-names])
+             (match (get-type name #:default 'no-type-found)
+               ['no-type-found #f] ; for expected type
+               [type type])))
+         (define expected-result
+           ;; FIXME: is this the best behavior? Synthesize if no annotations
+           ;;        are given, assume Any for partial annotations.
+           (if (andmap not expected-types)
+               #f
+               (ret (apply -seq (map (λ (x) (or x Univ)) expected-types)))))
+         (define result (tc-expr/check/t rhs-stx expected-result))
+         (define elem-types (seq->elem-type result))
+         (check-seq-length result elem-types new-names)
+         (check-binding-annotations elem-types new-names)
+         (values (append names new-names)
+                 (append types elem-types))))
      (printf "names ~a types ~a~n" names types)
+     ;; FIXME: this includes names that aren't bound in some #:when clauses
+     (define props
+       (with-lexical-env/extend-types names types
+         (for/fold ([props -no-filter])
+                   ([when-clause (in-list (find-whens #'for-loop))])
+           (define kind (tr:for:when-property when-clause))
+           (define results (tc-expr when-clause))
+           (match results
+             [(tc-results: _ (list (FilterSet: f+ f-) ...) _)
+              (match kind
+                ['#:when f+]
+                ['#:unless f-]
+                [_ null])]
+             [_ null]))))
+     (displayln props)
      (define bodies-result
        (with-lexical-env/extend-types names types
-         ;; FIXME expected
-         (tc-body/check #`#,bodies (make-for-body-expected kind expected))))
+         (with-lexical-env/extend-props props
+           (tc-body/check #`#,bodies (make-for-body-expected kind expected)))))
      (check-for-result kind bodies-result)]))
 
 ;; Type -> Type
@@ -158,13 +166,13 @@
 ;; Invariant: the first loop body found is always a special one
 ;;            that stores names that TR will track.
 (define (find-loop-bodies stx)
-  (find-stx-class (reify-syntax-class stx:tr:for:body^)))
+  (find-stx-class (reify-syntax-class tr:for:body^) stx))
 
 ;; Finds #:when clauses and other related clauses
-(define (find-when stx)
-  (find-stx-class (reify-syntax-class stx:tr:for:when^)))
+(define (find-whens stx)
+  (find-stx-class (reify-syntax-class tr:for:when^) stx))
 
-(define (find-stx-class cls)
+(define (find-stx-class cls stx)
   (reverse
    (let loop ([form stx] [bodies null])
      (syntax-parse form

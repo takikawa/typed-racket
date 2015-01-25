@@ -35,10 +35,16 @@
              #:with names #'(n.ann-name ...)
              #:with names-val #'(values n.ann-name ...)
              #:with new-form #'([(n.ann-name ...) rhs]))
-    (pattern (~seq #:when rhs)
-             #:with names #'()
-             #:with names-val #'(values)
-             #:with new-form #`(#:when #,(tr:for:when #'rhs))))
+    ;; FIXME: filters are relevant for #:when, #:unless,
+    ;;        #:break, #:final and may need special handling
+    (pattern (~seq (~and kw (~or #:when #:unless
+                                 #:break #:final))
+                   seq-rhs)
+             #:attr rhs #f
+             #:attr names #f
+             #:attr names-val #f
+             #:attr ann-rhs (tr:for:when-property #'seq-rhs (syntax-e #'kw))
+             #:with new-form #`(kw #,(attribute ann-rhs))))
 
   (define-splicing-syntax-class optional-standalone-annotation*
     #:attributes (ty annotate)
@@ -62,8 +68,10 @@
       a2:optional-standalone-annotation*
       body ...) ; body is not always an expression, can be a break-clause
      (define body-forms (syntax->list #'(body ...)))
+     (define/with-syntax (rhs ...) (filter values (attribute clause.rhs)))
+     (define/with-syntax (names ...) (filter values (attribute clause.names)))
+     (define/with-syntax (names-val ...) (filter values (attribute clause.names-val)))
      (define new-forms (apply append (map syntax->list (syntax->list #'(clause.new-form ...)))))
-     (displayln new-forms)
      ((attribute a1.annotate)
       ((attribute a2.annotate)
        (tr:for
@@ -71,12 +79,12 @@
           (let-values ()
             (quote #,(syntax-e untyped-name))
             (λ ()
-              (let-values ([clause.names clause.rhs] ...)
+              (let-values ([names rhs] ...)
                 (void)))
             (#,untyped-name (#,@new-forms)
               #,(tr:for:body
                  #'(λ ()
-                     (let-values ([clause.names clause.names-val] ...)
+                     (let-values ([names names-val] ...)
                        (void))))
               #,@(map tr:for:body body-forms)))))))]))
 

@@ -3510,6 +3510,8 @@
        [tc-e (for/hash ([x '(a b c)])
                (values (symbol->string x) (symbol->string x)))
              (-HT -String -String)]
+       [tc-e (for/list ([x '(-1 0 1 2 3)] #:when (positive? x)) x)
+             (-lst -PosByte)]
        [tc-err (let ()
                  (for/list ([x #hash((x . "x"))]) x)
                  (error "foo"))
