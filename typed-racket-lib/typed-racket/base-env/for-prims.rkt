@@ -16,7 +16,8 @@
          for/sum:
          for/product:
          for/hasheq:
-         for/hasheqv:)
+         for/hasheqv:
+         for/fold:)
 
 ;; FIXME
 (define-for-syntax (add-ann expr-stx ty-stx)
@@ -25,6 +26,12 @@
      #,expr-stx)))
 
 (begin-for-syntax
+  (define-syntax-class accum-clause
+    #:attributes (name rhs new-form)
+    (pattern [n:optionally-annotated-name rhs:expr]
+             #:with name #'n.ann-name
+             #:with new-form #'[n.ann-name rhs]))
+
   (define-splicing-syntax-class for-clause
     #:attributes (names names-val rhs new-form)
     (pattern [n:optionally-annotated-name rhs:expr]
@@ -53,15 +60,25 @@
 
 (define-syntax (define-for-variants stx)
   (syntax-parse stx
-    [(_ (name untyped-name) ...)
-     (quasisyntax/loc
-         stx
-       (begin (define-syntax name (define-for-variant #'untyped-name)) ...))]))
+    [(_ (name untyped-name (~optional (~and (~seq #:accum)
+                                            (~bind [accum? #'#t]))
+                                      #:defaults ([accum? #'#f])))
+        ...)
+     (quasisyntax/loc stx
+       (begin (define-syntax name (define-for-variant #'untyped-name accum?))
+              ...))]))
 
-(define-for-syntax ((define-for-variant untyped-name) stx)
+(define-for-syntax ((define-for-variant untyped-name accum?) stx)
   (syntax-parse stx
     [(_
       a1:optional-standalone-annotation*
+      ;; a pattern for expressing ~if
+      (~or (~and (~parse #t accum?)
+                 (accum:accum-clause ...))
+           (~and (~parse #f accum?)
+                 (~and (~seq) (~bind [(accum.name 1) null]
+                                     [(accum.rhs 1) null]
+                                     [(accum.new-form 1) null]))))
       (clause:for-clause ...)
       a2:optional-standalone-annotation*
       body ...) ; body is not always an expression, can be a break-clause
@@ -76,12 +93,23 @@
         (quasisyntax/loc stx
           (let-values ()
             (quote #,(syntax-e untyped-name))
+            (quote #,accum?)
             (λ ()
+              ;; for potential accumulator bindings
+              (let-values ([(accum.name) accum.rhs] ...)
+                (void))
+              ;; for the loop bindings
               (let-values ([names rhs] ...)
                 (void)))
-            (#,untyped-name (#,@new-forms)
+            (#,untyped-name #,@(if accum?
+                                   #'((accum.new-form ...))
+                                   #'())
+                            (#,@new-forms)
               #,(tr:for:body
                  #'(λ ()
+                     ;; same order as above
+                     (let-values ([(accum.name) accum.name] ...)
+                       (void))
                      (let-values ([names names-val] ...)
                        (void))))
               #,@(map tr:for:body body-forms)))))))]))
@@ -96,4 +124,5 @@
   (for/product: for/product)
   (for/hash: for/hash)
   (for/hasheq: for/hasheq)
-  (for/hasheqv: for/hasheqv))
+  (for/hasheqv: for/hasheqv)
+  (for/fold: for/fold #:accum))

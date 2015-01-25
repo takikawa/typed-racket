@@ -908,26 +908,6 @@ This file defines two sorts of primitives. All of them are provided into any mod
             for-stx
             #'(values var.ty ...))
            for-stx)))]))
-(define-syntax (for/fold: stx)
-  (syntax-parse stx
-    [(_ a1:optional-standalone-annotation*
-        accum:accumulator-bindings
-        clause:for-clauses
-        a2:optional-standalone-annotation*
-        c ...)
-     (define all-typed? (andmap values (attribute accum.ty)))
-     (define for-stx
-       (quasisyntax/loc stx
-         (for/fold ((accum.ann-name accum.init) ...)
-                   (clause.expand ... ...)
-           c ...)))
-     ((attribute a1.annotate)
-      ((attribute a2.annotate)
-       (if all-typed?
-           (add-ann
-            for-stx
-            #'(values accum.ty ...))
-           for-stx)))]))
 
 (define-syntax (for*: stx)
   (syntax-parse stx #:literals (: Void)

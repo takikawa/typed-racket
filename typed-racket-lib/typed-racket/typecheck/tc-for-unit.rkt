@@ -21,17 +21,30 @@
   (syntax-parse stx
     #:literal-sets (kernel-literals)
     [(let-values ()
-       (quote for-kw)
+       (quote for-kw:id)
+       (quote accum?:boolean)
        (#%expression
         (#%plain-lambda ()
+          (let-values ([_ accum-rhs] ...)
+            (#%plain-app _))
           (let-values ([_ rhs] ...)
             (#%plain-app _))))
        for-loop)
+     (define accum? (syntax-e #'accum?))
      (define kind (syntax-e #'for-kw))
      (define *bodies (find-loop-bodies #'for-loop))
      (match-define (cons names-stx bodies) *bodies)
      (define rhs-stxs (syntax->list #'(rhs ...)))
-     (define clause-names (parse-clause-names names-stx))
+     (define-values (accum-names clause-names)
+       (parse-clause-names names-stx))
+     (define accum-types
+       (for/list ([name (in-list accum-names)]
+                  [rhs-stx (in-list (syntax->list #'(accum-rhs ...)))])
+         (define expected-result
+           (match (get-type name #:default 'no-type-found)
+             ['no-type-found #f] ; for expected type
+             [type (ret type)]))
+         (tc-expr/check/t rhs-stx expected-result)))
      (define-values (names types)
        (for/fold ([names null] [types null])
                  ([names-stx (in-list clause-names)]
@@ -54,26 +67,28 @@
          (check-binding-annotations elem-types new-names)
          (values (append names new-names)
                  (append types elem-types))))
+     (printf "accum-names ~a accum-types ~a~n" accum-names accum-types)
      (printf "names ~a types ~a~n" names types)
      ;; FIXME: this includes names that aren't bound in some #:when clauses
      (define props
-       (with-lexical-env/extend-types names types
-         (for/fold ([props null])
-                   ([when-clause (in-list (find-whens #'for-loop))])
-           (define kind (tr:for:when-property when-clause))
-           (define results (tc-expr when-clause))
-           (match results
-             [(tc-results: _ (list (FilterSet: f+ f-) ...) _)
-              (match kind
-                ['#:when (append f+ props)]
-                [(or '#:unless '#:break) (append f- props)]
-                [_ props])]
-             [_ props]))))
-     (displayln props)
+       (with-lexical-env/extend-types accum-names accum-types
+         (with-lexical-env/extend-types names types
+           (for/fold ([props null])
+                     ([when-clause (in-list (find-whens #'for-loop))])
+             (define kind (tr:for:when-property when-clause))
+             (define results (tc-expr when-clause))
+             (match results
+               [(tc-results: _ (list (FilterSet: f+ f-) ...) _)
+                (match kind
+                  ['#:when (append f+ props)]
+                  [(or '#:unless '#:break) (append f- props)]
+                  [_ props])]
+               [_ props])))))
      (define bodies-result
-       (with-lexical-env/extend-types names types
-         (with-lexical-env/extend-props props
-           (tc-body/check #`#,bodies (make-for-body-expected kind expected)))))
+       (with-lexical-env/extend-types accum-names accum-types
+         (with-lexical-env/extend-types names types
+           (with-lexical-env/extend-props props
+             (tc-body/check #`#,bodies (make-for-body-expected kind expected))))))
      (check-for-result kind bodies-result)]))
 
 ;; Type -> Type
@@ -128,12 +143,14 @@
           [(Listof: t) (ret t)]
           [(List: ts) (ret (apply Un ts))]
           [_ #f])]
-       [(or 'for/first 'for/last 'for/and 'for/or)
+       [(or 'for/first 'for/last 'for/and 'for/or 'for/fold)
         expected]
        [_ #f])]
     [(tc-results: ts fs os)
-     ;; FIXME: only relevant for for/fold, for/lists, etc.
-     #f]
+     (match kind
+       ['for/fold
+        expected]
+       [_ #f])]
     [(tc-any-results: _)
      #f]))
 
@@ -150,13 +167,15 @@
         (with-lexical-env/extend-types tmps (list (-lst t))
           (tc/apply (if (eq? kind 'for/sum) #'+ #'*)
                     #`#,tmps))]
-       [(or 'for/first 'for/last 'for/and 'for/or)
+       [(or 'for/first 'for/last 'for/and 'for/or 'for/fold)
         (ret t)])]
     [(tc-results: ts fs os)
      (match kind
        [(or 'for/hash 'for/hasheq 'for/hasheqv)
         #:when (= (length ts) 2)
         (ret (-HT (car ts) (cadr ts)))]
+       ['for/fold
+        (ret ts)]
        [_ (tc-error/fields "type mismatch"
                            #:more "wrong number of values"
                            "given" (length ts))])]
@@ -185,13 +204,16 @@
           (loop e bodies))]
        [x bodies]))))
 
-;; Syntax -> (Listof Syntax)
+;; Syntax -> (Listof Syntax) (Listof Syntax)
 (define (parse-clause-names stx)
   (syntax-parse stx
     #:literal-sets (kernel-literals)
     [(#%expression
       (#%plain-lambda ()
+        (let-values ([_ accum-name] ...)
+          _)
         (let-values ([_ (#%plain-app _ . clause-names)] ...)
           _)))
-     (syntax->list #'(clause-names ...))]
+     (values (syntax->list #'(accum-name ...))
+             (syntax->list #'(clause-names ...)))]
     [_ (int-err "wrong expansion")]))
