@@ -42,6 +42,9 @@
 
 (struct contract-def (type flat? maker? typed-side) #:prefab)
 
+;; Note: this is a hack for testing on this branch
+(define current-opaque? (make-parameter #t))
+
 ;; Checks if the given syntax needs to be fixed up for contract generation
 ;; and if yes it returns the information stored in the property
 (define (get-contract-def-property stx)
@@ -433,19 +436,11 @@
                      (list untyped typed both)
                      (recursive-sc-use (if (from-typed? typed-side) typed-n* untyped-n*)))])]
         ;; Don't directly use the class static contract generated for Name,
-        ;; because that will get an #:opaque class contract. This will do the
-        ;; wrong thing for object types since it errors too eagerly.
+        ;; Note: this is a hack just for this branch to test the difference in performance
+        ;;       between object and instanceof contracts
         [(Instance: (? Name? t))
          #:when (Class? (resolve-once t))
-         (cond [(lookup-name-sc type typed-side)]
-               [else
-                (define rv recursive-values)
-                (define resolved (make-Instance (resolve-once t)))
-                (register-name-sc type
-                                  (λ () (loop resolved 'untyped rv))
-                                  (λ () (loop resolved 'typed rv))
-                                  (λ () (loop resolved 'both rv)))
-                (lookup-name-sc type typed-side)])]
+         (instanceof/sc (parameterize ([current-opaque? #f]) (t->sc t)))]
         [(Instance: (Class: _ _ fields methods _ _))
          (match-define (list (list field-names field-types) ...) fields)
          (match-define (list (list public-names public-types) ...) methods)
@@ -481,7 +476,7 @@
                  [else null]))
          (class/sc ;; only enforce opaqueness if there's no row variable
                    ;; and we are importing from untyped
-                   (and (from-untyped? typed-side) (not row-var))
+                   (and (from-untyped? typed-side) (not row-var) (current-opaque?))
                    (append
                      (map (λ (n sc) (member-spec 'override n sc))
                           override-names (map t->sc/meth override-types))
