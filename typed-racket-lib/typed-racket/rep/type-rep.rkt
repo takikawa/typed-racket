@@ -525,15 +525,15 @@
 ;; t is the type of the result of syntax-e, not the result of syntax->datum
 (def-type Syntax ([t Type/c]) [#:key 'syntax])
 
-;; A Row used in type instantiation
-;; For now, this should not appear in user code. It's used
-;; internally to perform row instantiations and to represent
-;; class types.
+;; A Row used in row instantiation and to represent class types.
+;;
+;; inits   - the boolean determines optional/mandatory status
+;; methods - the boolean is for final status
 ;;
 ;; invariant: all clauses are sorted by the key name
 (def-type Row ([inits (listof (list/c symbol? Type/c boolean?))]
                [fields (listof (list/c symbol? Type/c))]
-               [methods (listof (list/c symbol? Type/c))]
+               [methods (listof (list/c symbol? Type/c boolean?))]
                [augments (listof (list/c symbol? Type/c))]
                [init-rest (or/c Type/c #f)])
   #:no-provide

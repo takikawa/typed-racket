@@ -310,6 +310,14 @@
    (pattern [(name:id type) ...]
             #:with data #'(list (list (quote name) type) ...)))
 
+ ;; includes keywords for final, etc.
+ (define-syntax-class names+types/methods
+   #:attributes (data)
+   (pattern [(name:id type
+              (~optional (~and #:final (~bind [final? #t]))))
+             ...]
+            #:with data #'(list (list (quote name) type final?) ...)))
+
  (define-syntax-class names+types+opt
    #:attributes (data no-opts)
    (pattern [(name:id type opt?) ...]

@@ -190,8 +190,8 @@
   #:attributes (field-names field-types method-names method-types)
   #:literal-sets (class-type-literals)
   (pattern (~seq (~or ((~or field untyped:field)
-                       field-clause:field-or-method-type ...)
-                      method-clause:field-or-method-type)
+                       field-clause:field-type ...)
+                      method-clause:method-type)
                  ...)
            #:with field-names (flatten-class-clause #'((field-clause.label ...) ...))
            #:with field-types (flatten-class-clause #'((field-clause.type ...) ...))
@@ -315,7 +315,7 @@
                    parse-type)
            #:attr method-entries null
            #:attr augment-entries null)
-  (pattern ((~or field untyped:field) field-clause:field-or-method-type ...)
+  (pattern ((~or field untyped:field) field-clause:field-type ...)
            #:attr init-entries null
            #:attr field-entries
                   (make-field/augment-entries
@@ -325,7 +325,7 @@
            #:attr method-entries null
            #:attr augment-entries null)
   (pattern ((~or augment untyped:augment)
-            augment-clause:field-or-method-type ...)
+            augment-clause:simple-method-type ...)
            #:attr init-entries null
            #:attr field-entries null
            #:attr method-entries null
@@ -334,12 +334,13 @@
                    #'(augment-clause.label ...)
                    #'(augment-clause.type ...)
                    parse-type))
-  (pattern method-clause:field-or-method-type
+  (pattern method-clause:method-type
            #:attr init-entries null
            #:attr field-entries null
            #:attr method-entries
                   (list (list (syntax-e #'method-clause.label)
-                              (parse-type #'method-clause.type)))
+                              (parse-type #'method-clause.type)
+                              (attribute method-clause.final?)))
            #:attr augment-entries null))
 
 (define-syntax-class init-type
@@ -349,8 +350,18 @@
    (label:id type:expr
     (~optional (~and #:optional (~bind [optional? #t]))))))
 
-(define-syntax-class field-or-method-type
-  #:description "Pair of field or method label and type"
+(define-syntax-class field-type
+  #:description "Field label and type"
   #:attributes (label type)
   (pattern (label:id type:expr)))
 
+(define-syntax-class simple-method-type
+  #:description "Method label and type"
+  #:attributes (label type)
+  (pattern (label:id type:expr)))
+
+(define-syntax-class method-type
+  #:description "Method label and type"
+  #:attributes (label type final?)
+  (pattern (label:id type:expr
+            (~optional (~and #:final (~bind [final? #t]))))))
