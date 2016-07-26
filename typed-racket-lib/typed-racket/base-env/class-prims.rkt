@@ -314,7 +314,7 @@
   ;; and emit an error using the given syntax object if it does
   (define (check-unsupported-feature id stx)
     (when (member id unsupported-forms free-identifier=?)
-      (tc-error/stx id "unsupported class clause: ~a" stx)))
+      (tc-error/stx id "unsupported class clause")))
 
   ;; do-make-class-name-table : Listof<Id> Listof<Clause> Listof<Id> -> Stx
   ;; construct syntax used by the class type-checker as a reliable source
