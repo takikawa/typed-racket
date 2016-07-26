@@ -2142,4 +2142,14 @@
               (define/public-final (m) (void))))
           (send (new c%) m))
         -Void]
+  [tc-err (let ()
+            (define c%
+              (class object%
+                (super-new)
+                (define/public-final (m) (void))))
+            (class c%
+              (super-new)
+              (define/override (m) (void)))
+            (error "foo"))
+          #:msg "inheritance mismatch"]
   ))
