@@ -652,12 +652,13 @@
            (Instance: (Class: _ _ field-map* method-map* augment-map* _)))
           (define (subtype-clause? map map*)
             (and (for/and ([key+type (in-list map*)])
-                   (match-define (list key type) key+type)
+                   (match-define (cons key _) key+type)
                    (assq key map))
                  (let/ec escape
                    (for/fold ([A A0])
                              ([key+type (in-list map)])
-                     (match-define (list key type) key+type)
+                     ;; ignore finality for object type
+                     (match-define (cons key (cons type _)) key+type)
                      (define result (assq (car key+type) map*))
                      (or (and (not result) A)
                          (let ([type* (cadr result)])
@@ -676,11 +677,14 @@
           (define (equal-clause? clause clause* [inits? #f])
             (cond
              [(not inits?)
-              (match-define (list (list names types) ...) clause)
-              (match-define (list (list names* types*) ...) clause*)
+              (match-define (list (cons names (cons types rst)) ...)
+                            clause)
+              (match-define (list (cons names* (cons types* rst*)) ...)
+                            clause*)
               (and (= (length names) (length names*))
                    (andmap equal? names names*)
-                   (andmap sub types types*))]
+                   (andmap sub types types*)
+                   (andmap equal? rst rst*))]
              [else
               (match-define (list (list names types opt?) ...)
                             clause)

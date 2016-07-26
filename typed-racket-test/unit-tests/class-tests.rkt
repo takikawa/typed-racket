@@ -2132,4 +2132,14 @@
                 (values (open-input-file path) (open-output-file path)))
               (super-new)))
           (void))
-        -Void]))
+        -Void]
+
+  ;;; Tests for final methods
+  [tc-e (let ()
+          (define c%
+            (class object%
+              (super-new)
+              (define/public-final (m) (void))))
+          (send (new c%) m))
+        -Void]
+  ))

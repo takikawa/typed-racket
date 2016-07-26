@@ -156,7 +156,8 @@
          (and row (inf row))
          (map list init-names (map inf init-tys) init-reqds)
          (map list field-names (map inf field-tys))
-         (map list method-names (map inf method-tys))
+         ;; FIXME: final flags may need to be generated in a smarter way
+         (map list method-names (map inf method-tys) (map (λ (_) #f) method-tys))
          (map list augment-names (map inf augment-tys))
          init-rest)])]))
   (inf type)

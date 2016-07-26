@@ -768,7 +768,10 @@
         (int-err (~a "merge-types: actual type ~a not"
                      " a subtype of annotated type ~a")
                  (car type) (car old-type)))
-      (dict-set methods name (list (car type) (cadr old-type)))))
+      (dict-set methods name
+                (if publics?
+                    (list (car type) (cadr old-type))
+                    (list (car type))))))
   (make-Class row-var inits fields
               (make-new-methods methods method-types #t)
               (make-new-methods augments augment-types #f)
@@ -1536,7 +1539,7 @@
 
   ;; construct type dicts for fields, methods, and augments
   (define final-names (hash-ref parse-info 'final-names))
-  (define ((make-type-dict method?)
+  (define ((make-type-dict do-final?)
            names supers expected default-type
            #:annotations-from [annotation-table annotation-table])
     (for/fold ([type-dict supers])
@@ -1544,7 +1547,7 @@
       (define external (dict-ref internal-external-mapping name))
       (define (update-dict type)
         (define entry
-          (if method?
+          (if do-final?
               (list type
                     (and (member name final-names) #t))
               (list type)))
@@ -1555,7 +1558,7 @@
                           default-type))
       (assign-type name expected annotation-table update-dict default)))
   (define make-method-dict (make-type-dict #t))
-  (define make-field-dict  (make-type-dict #f))
+  (define make-field/augment-dict (make-type-dict #f))
 
   (define-values (expected-inits expected-fields
                   expected-publics expected-augments
@@ -1572,7 +1575,7 @@
             (hash-ref parse-info 'override-internals)
             (hash-ref parse-info 'init-rest-name)))
   (define init-types (make-inits inits super-inits expected-inits))
-  (define field-types (make-field-dict fields super-fields expected-fields Univ))
+  (define field-types (make-field/augment-dict fields super-fields expected-fields Univ))
 
   ;; This should consider all new public methods, but should also look at
   ;; overrides to ensure that if an overriden method has a more specific type
@@ -1581,7 +1584,7 @@
                                          super-methods expected-publics
                                          top-func))
 
-  (define augment-types (make-method-dict
+  (define augment-types (make-field/augment-dict
                          pubments super-augments expected-augments top-func
                          #:annotations-from augment-annotation-table))
   ;; For the init-rest type, if the user didn't provide one, then

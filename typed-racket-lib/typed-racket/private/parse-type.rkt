@@ -735,12 +735,12 @@
                   super-methods super-augments)
     (match-parent-type parent-type))
 
-  (match-define (list (list field-names _) ...) fields)
-  (match-define (list (list method-names _) ...) methods)
-  (match-define (list (list augment-names _) ...) augments)
-  (match-define (list (list super-field-names _) ...) super-fields)
-  (match-define (list (list super-method-names _) ...) super-methods)
-  (match-define (list (list super-augment-names _) ...) super-augments)
+  (match-define (list (cons field-names _) ...) fields)
+  (match-define (list (cons method-names _) ...) methods)
+  (match-define (list (cons augment-names _) ...) augments)
+  (match-define (list (cons super-field-names _) ...) super-fields)
+  (match-define (list (cons super-method-names _) ...) super-methods)
+  (match-define (list (cons super-augment-names _) ...) super-augments)
 
   ;; it is an error for both the extending type and extended type
   ;; to have row variables
@@ -777,7 +777,10 @@
                          (stx-map parse-type #'clause.field-types)))
      (define methods (map list
                           (stx-map syntax-e #'clause.method-names)
-                          (stx-map parse-type #'clause.method-types)))
+                          (stx-map parse-type #'clause.method-types)
+                          ;; finality doesn't matter but it's needed for
+                          ;; constructing the class part of the type
+                          (stx-map (λ (_) #f) #'clause.method-names)))
      (check-function-types methods)
      (make-Instance (make-Class #f null fields methods null #f))]))
 

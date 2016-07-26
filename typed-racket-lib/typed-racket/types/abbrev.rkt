@@ -314,8 +314,8 @@
  (define-syntax-class names+types/methods
    #:attributes (data)
    (pattern [(name:id type
-              (~optional (~and #:final (~bind [final? #t]))))
-             ...]
+              (~optional (~and #:final (~bind [final? #'#t]))
+                         #:defaults ([final? #'#f]))) ...]
             #:with data #'(list (list (quote name) type final?) ...)))
 
  (define-syntax-class names+types+opt
@@ -336,7 +336,7 @@
             #:with fields #'sub-clauses.no-opts
             #:with methods #'null
             #:with augments #'null)
-   (pattern (~seq #:method sub-clauses:names+types)
+   (pattern (~seq #:method sub-clauses:names+types/methods)
             #:with inits #'null
             #:with fields #'null
             #:with methods #'sub-clauses.data
