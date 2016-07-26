@@ -488,6 +488,16 @@
                           annotation-table
                           augment-annotation-table)
 
+  ;; Check that final methods aren't overridden
+  (for ([override-name (in-list (hash-ref parse-info 'override-names))])
+    (define maybe-super (dict-ref super-methods override-name #f))
+    (when maybe-super
+      (match-define (list _ final?) maybe-super)
+      (when final?
+        (tc-error/fields "inheritance mismatch"
+                         #:more (~a "cannot override final method "
+                                    override-name)))))
+
   ;; Calculate remaining inits, optional inits, etc.
   (check-by-name super-new super-inits)
 

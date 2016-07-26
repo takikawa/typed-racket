@@ -344,8 +344,8 @@
                  `(,name ,(type->sexp type)))))))
   (define methods*
     (for/list ([name+type (in-list methods)])
-      (match-define (list name type) name+type)
-      `(,name ,(type->sexp type))))
+      (match-define (list name type final?) name+type)
+      `(,name ,(type->sexp type) ,@(if final? '(#:final) '()))))
   (define augments*
     (cond [(or object? (null? augments)) '()]
           [else (list (cons 'augment augments))]))
