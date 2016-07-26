@@ -73,6 +73,7 @@
                                      (#:field field-names:name-pair ...)
                                      (#:public public-names:name-pair ...)
                                      (#:override override-names:name-pair ...)
+                                     (#:final finals:name-pair ...)
                                      (#:private privates:id ...)
                                      (#:private-field private-fields:id ...)
                                      (#:inherit inherit-names:name-pair ...)
@@ -103,6 +104,7 @@
            #:with augment-internals #'(augment-names.internal ...)
            #:with pubment-externals #'(pubment-names.external ...)
            #:with pubment-internals #'(pubment-names.internal ...)
+           #:with final-names #'(finals.external ...)
            #:with private-names #'(privates ...)
            #:with private-field-names #'(private-fields ...)))
 
@@ -386,6 +388,7 @@
                            (syntax->datum #'tbl.init-field-externals))
                 'public-names   (syntax->datum #'tbl.public-externals)
                 'override-names (syntax->datum #'tbl.override-externals)
+                'final-names    (syntax->datum #'tbl.final-names)
                 'pubment-names  (syntax->datum #'tbl.pubment-externals)
                 'augment-names  (syntax->datum #'tbl.augment-externals)
                 'inherit-names  (syntax->datum #'tbl.inherit-externals)
@@ -494,7 +497,8 @@
     (when maybe-super
       (match-define (list _ final?) maybe-super)
       (when final?
-        (tc-error/fields "inheritance mismatch"
+        (tc-error/fields #:delayed? #t
+                         "inheritance mismatch"
                          #:more (~a "cannot override final method "
                                     override-name)))))
 
@@ -743,7 +747,7 @@
   (check-absent super-augment-names (hash-ref parse-info 'pubment-names)
                 "public augmentable method"))
 
-;; merge-types : Type Dict<Symbol, Type> Dict<Symbol, Type> -> Type
+;; merge-types : Type (Dict Symbol (List Type)) (Dict Symbol (List Type)) -> Type
 ;; Given a self object type, construct the real class type based on
 ;; new information found from type-checking. Only used when an expected
 ;; type was not provided.
@@ -753,7 +757,7 @@
     (and class-type
          (Class: row-var inits fields methods augments init-rest)))
    self-type)
-  (define (make-new-methods methods method-types)
+  (define (make-new-methods methods method-types [publics? #f])
     (for/fold ([methods methods])
               ([(name type) (in-dict method-types)])
       (define old-type (dict-ref methods name #f))
@@ -764,10 +768,10 @@
         (int-err (~a "merge-types: actual type ~a not"
                      " a subtype of annotated type ~a")
                  (car type) (car old-type)))
-      (dict-set methods name type)))
+      (dict-set methods name (list (car type) (cadr old-type)))))
   (make-Class row-var inits fields
-              (make-new-methods methods method-types)
-              (make-new-methods augments augment-types)
+              (make-new-methods methods method-types #t)
+              (make-new-methods augments augment-types #f)
               init-rest))
 
 ;; local-tables->lexical-env : Dict Dict<Symbol, Symbol>
@@ -1236,7 +1240,9 @@
                     values
                     (#%plain-lambda ()
                       (quote ((~datum declare-this-escapes)))
-                      (#%plain-app (#%plain-app local-method:id _) _))
+                      (~or (#%plain-app (#%plain-app local-method:id _) _)
+                           ;; final method calls look like this
+                           (#%plain-app local-method:id _)))
                     ...)]
                   [(private:id ...)
                    (#%plain-app
@@ -1529,19 +1535,27 @@
     (append (reverse new-inits) inits))
 
   ;; construct type dicts for fields, methods, and augments
-  (define (make-type-dict names supers expected default-type
-                          #:annotations-from [annotation-table annotation-table])
+  (define final-names (hash-ref parse-info 'final-names))
+  (define ((make-type-dict method?)
+           names supers expected default-type
+           #:annotations-from [annotation-table annotation-table])
     (for/fold ([type-dict supers])
               ([name names])
       (define external (dict-ref internal-external-mapping name))
       (define (update-dict type)
-        (define entry (list type))
+        (define entry
+          (if method?
+              (list type
+                    (and (member name final-names) #t))
+              (list type)))
         (dict-set type-dict external entry))
       ;; only use the default type if the super-type doesn't already
       ;; have an entry, e.g., for overrides
       (define default (or (car (dict-ref type-dict external (list #f)))
                           default-type))
       (assign-type name expected annotation-table update-dict default)))
+  (define make-method-dict (make-type-dict #t))
+  (define make-field-dict  (make-type-dict #f))
 
   (define-values (expected-inits expected-fields
                   expected-publics expected-augments
@@ -1558,16 +1572,16 @@
             (hash-ref parse-info 'override-internals)
             (hash-ref parse-info 'init-rest-name)))
   (define init-types (make-inits inits super-inits expected-inits))
-  (define field-types (make-type-dict fields super-fields expected-fields Univ))
+  (define field-types (make-field-dict fields super-fields expected-fields Univ))
 
   ;; This should consider all new public methods, but should also look at
   ;; overrides to ensure that if an overriden method has a more specific type
   ;; (via depth subtyping) then it's accounted for.
-  (define public-types (make-type-dict (append publics pubments overrides)
-                                       super-methods expected-publics
-                                       top-func))
+  (define public-types (make-method-dict (append publics pubments overrides)
+                                         super-methods expected-publics
+                                         top-func))
 
-  (define augment-types (make-type-dict
+  (define augment-types (make-method-dict
                          pubments super-augments expected-augments top-func
                          #:annotations-from augment-annotation-table))
   ;; For the init-rest type, if the user didn't provide one, then

@@ -547,7 +547,7 @@
                 [(list
                   (list (list init-names init-tys reqd) ___)
                   (list (list fname fty) ___)
-                  (list (list mname mty) ___)
+                  (list (list mname mty mfinal?) ___)
                   (list (list aname aty) ___)
                   init-rest)
                  (*Row
@@ -556,7 +556,7 @@
                        (map type-rec-id init-tys)
                        reqd)
                   (map list fname (map type-rec-id fty))
-                  (map list mname (map type-rec-id mty))
+                  (map list mname (map type-rec-id mty) mfinal?)
                   (map list aname (map type-rec-id aty))
                   (if init-rest (type-rec-id init-rest) #f))])])
 
